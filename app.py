@@ -154,9 +154,11 @@ if "results" in st.session_state:
             for val in col:
                 s = str(val)
                 if s.startswith("✅"):
-                    out.append("background-color:#C6EFCE")
-                elif s.startswith("🔼") or s.startswith("🔽"):
-                    out.append("background-color:#FFC7CE")
+                    out.append("background-color:#C6EFCE")   # match  = green
+                elif s.startswith("🔼"):
+                    out.append("background-color:#BDD7EE")   # higher = bluish
+                elif s.startswith("🔽"):
+                    out.append("background-color:#FFC7CE")   # lower  = reddish
                 else:
                     out.append("")
             return out
