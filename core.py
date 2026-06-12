@@ -361,15 +361,35 @@ def compare(expected, computed):
     out = OrderedDict()
     for key in METRIC_KEYS:
         exp, got = expected.get(key), computed.get(key)
+        match, delta, direction = False, None, "?"
         try:
+            e, g = float(exp), float(got)
+            d = g - e
             if key == "avg_citations":
-                match = exp is not None and abs(float(exp) - float(got)) <= 0.05
+                delta = round(d, 2)
+                match = abs(d) <= 0.05
             else:
-                match = exp is not None and int(exp) == int(got)
+                delta = int(round(d))
+                match = (delta == 0)
+            direction = "equal" if match else ("higher" if g > e else "lower")
         except Exception:
-            match = False
-        out[key] = {"expected": exp, "computed": got, "match": match}
+            pass
+        out[key] = {"expected": exp, "computed": got, "match": match,
+                    "delta": delta, "direction": direction}
     return out
+
+
+ARROW = {"equal": "=", "higher": "↑", "lower": "↓", "?": "?"}
+
+def delta_str(v):
+    """Compact signed-delta text, e.g. '↑ +5', '↓ -3', '=' or '' when unknown."""
+    if v["direction"] == "equal":
+        return "="
+    if v["delta"] is None:
+        return ""
+    d = v["delta"]
+    sign = "+" if d > 0 else ""
+    return "%s %s%g" % (ARROW[v["direction"]], sign, d)
 
 def verify_all(parsed, info, keysets, cfg):
     results = []
@@ -403,7 +423,7 @@ def report_to_xlsx_bytes(results, cfg=None):
                    "reviews_as_articles=%s" % cfg.count_review_as_article]); ws.append([])
     hdr = ["ПН", "Направление", "Docs"]
     for key in METRIC_KEYS:
-        hdr += [key + " (file)", key + " (calc)", key + " match"]
+        hdr += [key + " (file)", key + " (calc)", key + " Δ"]
     ws.append(hdr)
     for c in ws[ws.max_row]:
         c.font = Font(bold=True)
@@ -413,7 +433,7 @@ def report_to_xlsx_bytes(results, cfg=None):
         row = [r["pn"], r["name"], r["n_documents"]]
         for key in METRIC_KEYS:
             v = r["cmp"][key]
-            row += [v["expected"], v["computed"], "YES" if v["match"] else "NO"]
+            row += [v["expected"], v["computed"], delta_str(v)]
         ws.append(row)
         last, col = ws.max_row, 4
         for key in METRIC_KEYS:
