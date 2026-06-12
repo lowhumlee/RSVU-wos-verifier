@@ -414,8 +414,9 @@ def report_to_xlsx_bytes(results, cfg=None):
     wb = openpyxl.Workbook()
     ws = wb.active
     ws.title = "WoS verification"
-    green = PatternFill("solid", fgColor="C6EFCE")
-    red = PatternFill("solid", fgColor="FFC7CE")
+    green = PatternFill("solid", fgColor="C6EFCE")   # match
+    blue = PatternFill("solid", fgColor="BDD7EE")    # higher
+    red = PatternFill("solid", fgColor="FFC7CE")     # lower
     if cfg:
         ws.append(["Settings:", "org=%s" % cfg.org_query,
                    "years=%d-%d" % (cfg.py_from, cfg.py_to),
@@ -437,7 +438,9 @@ def report_to_xlsx_bytes(results, cfg=None):
         ws.append(row)
         last, col = ws.max_row, 4
         for key in METRIC_KEYS:
-            ws.cell(last, col + 2).fill = green if r["cmp"][key]["match"] else red
+            v = r["cmp"][key]
+            fill = green if v["match"] else (blue if v["direction"] == "higher" else red)
+            ws.cell(last, col + 2).fill = fill
             col += 3
     for col_cells in ws.columns:
         w = max((len(str(c.value)) if c.value is not None else 0) for c in col_cells) + 2
