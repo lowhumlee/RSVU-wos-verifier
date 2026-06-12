@@ -133,7 +133,14 @@ if "results" in st.session_state:
                 v = r["cmp"][key]
                 row["%s file" % key] = v["expected"]
                 row["%s calc" % key] = v["computed"]
-                row["%s ✓" % key] = "✅" if v["match"] else "❌"
+                if v["match"]:
+                    row["%s Δ" % key] = "✅"
+                elif v["direction"] == "higher":
+                    row["%s Δ" % key] = "🔼 +%g" % v["delta"]
+                elif v["direction"] == "lower":
+                    row["%s Δ" % key] = "🔽 %g" % v["delta"]
+                else:
+                    row["%s Δ" % key] = "—"
                 tot += 1; match += 1 if v["match"] else 0
         else:
             row["note"] = r.get("note", "")
@@ -142,9 +149,17 @@ if "results" in st.session_state:
         st.metric("Indicators matching", "%d / %d" % (match, tot))
     df = pd.DataFrame(rows)
     def _hl(col):
-        if col.name.endswith("✓"):
-            return ["background-color:#C6EFCE" if v == "✅"
-                    else ("background-color:#FFC7CE" if v == "❌" else "") for v in col]
+        if col.name.endswith("Δ"):
+            out = []
+            for val in col:
+                s = str(val)
+                if s.startswith("✅"):
+                    out.append("background-color:#C6EFCE")
+                elif s.startswith("🔼") or s.startswith("🔽"):
+                    out.append("background-color:#FFC7CE")
+                else:
+                    out.append("")
+            return out
         return ["" for _ in col]
     st.dataframe(df.style.apply(_hl, axis=0), hide_index=True, use_container_width=True)
     st.download_button("⬇ Download report (.xlsx)",
