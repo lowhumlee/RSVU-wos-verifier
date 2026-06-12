@@ -40,6 +40,7 @@ class Config:
     py_from: int = 2021
     py_to: int = 2025
     article_doctypes: tuple = ("Article",)
+    proceedings_doctypes: tuple = ("Proceedings Paper",)
     count_review_as_article: bool = False
     collab_min_institutions: int = 2      # >=2 distinct institutions => collaborative
     page_size: int = 100                  # Expanded hard max
@@ -59,11 +60,12 @@ INFO_COLS = OrderedDict([
     ("N", ("avg_citations",  14)),
     ("P", ("cited_once",     16)),
     ("R", ("articles",       18)),
+    ("T", ("proceedings",    20)),
     ("U", ("collaborative",  21)),
 ])
 PN_CODE_COL = 3
 PN_NAME_COL = 4
-METRIC_KEYS = ("h_index", "avg_citations", "cited_once", "articles", "collaborative")
+METRIC_KEYS = ("h_index", "avg_citations", "cited_once", "articles", "proceedings", "collaborative")
 
 def pn_code_to_matrix(code):
     return "ПН" + str(int(code))
@@ -344,12 +346,14 @@ def compute_metrics(parsed, cfg):
     tcs = [d["tc"] for d in parsed]
     n = len(tcs)
     art = cfg.article_type_set()
+    proc = set(cfg.proceedings_doctypes)
     return {
         "n_documents": n,
         "h_index": h_index(tcs),
         "avg_citations": round(sum(tcs) / n, 2) if n else 0,
         "cited_once": sum(1 for t in tcs if t >= 1),
         "articles": sum(1 for d in parsed if any(x in art for x in d["doctypes"])),
+        "proceedings": sum(1 for d in parsed if any(x in proc for x in d["doctypes"])),
         "collaborative": sum(1 for d in parsed if d["ninst"] >= cfg.collab_min_institutions),
     }
 
@@ -450,11 +454,23 @@ def _selftest():
     assert p["doctypes"] == ["Article"], p
     assert p["research_areas(extended,norm)"] == [norm_key("General & Internal Medicine")], p
     assert p["num_institutions"] == 2, p
-    parsed = parse_records([rec, rec])             # dedup
-    assert len(parsed) == 1
+    # second record: a Proceedings Paper, single institution, 0 cites
+    rec2 = {
+        "UID": "WOS:000222",
+        "dynamic_data": {"citation_related": {"tc_list": {"silo_tc": {"coll_id": "WOS", "local_count": 0}}}},
+        "static_data": {
+            "summary": {"doctypes": {"doctype": "Proceedings Paper"}},
+            "fullrecord_metadata": {
+                "category_info": {"subjects": {"subject": {"ascatype": "extended", "content": "General & Internal Medicine"}}},
+                "addresses": {"address_name": {"address_spec": {"organizations": {"organization": {"pref": "Y", "content": "Medical University Varna"}}}}},
+            },
+        },
+    }
+    parsed = parse_records([rec, rec, rec2])        # rec deduped; rec2 distinct
+    assert len(parsed) == 2
     m = compute_metrics(parsed, cfg)
-    assert m == {"n_documents": 1, "h_index": 1, "avg_citations": 7.0,
-                 "cited_once": 1, "articles": 1, "collaborative": 1}, m
+    assert m == {"n_documents": 2, "h_index": 1, "avg_citations": 3.5,
+                 "cited_once": 1, "articles": 1, "proceedings": 1, "collaborative": 1}, m
     return "OK", p, m
 
 if __name__ == "__main__":
